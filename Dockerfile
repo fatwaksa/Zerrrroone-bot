@@ -1,20 +1,17 @@
-# استخدم Python 3.11 الرسمي
-FROM python:3.11-slim
+# Use official Python image
+FROM python:3.13-slim
 
-# تعيين مجلد العمل داخل الحاوية
+# Set working directory
 WORKDIR /app
 
-# نسخ ملفات المشروع (bot.py و requirements.txt)
-COPY requirements.txt .
-COPY bot.py .
+# Copy files
+COPY . .
 
-# تثبيت المكتبات المطلوبة
-RUN pip install --no-cache-dir --upgrade pip
+# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# تحديد متغير البيئة للـ Telegram Bot Token
-# على Railway يمكنك إضافته من Dashboard بدل كتابته هنا
-# ENV BOT_TOKEN=YOUR_BOT_TOKEN_HERE
+# Set environment variable for token (يمكن وضعه في Railway مباشرة)
+# ENV BOT_TOKEN=your_token_here
 
-# أمر تشغيل البوت
+# Run bot
 CMD ["python", "bot.py"]
