@@ -1,8 +1,2 @@
-# Telegram bot library (async/await)
 python-telegram-bot==20.7
-
-# Asynchronous HTTP requests
 aiohttp>=3.8.5
-
-# Optional: أي مكتبات إضافية قد تحتاجها مستقبليًا
-# requests>=2.31.0
