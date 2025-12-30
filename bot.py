@@ -1,4 +1,3 @@
-# bot.py
 import os
 import logging
 from telegram import Update
@@ -15,22 +14,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👋 أهلاً بك في البوت!")
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
-    await update.message.reply_text(f"📩 استلمت: {text}")
+    await update.message.reply_text(f"📩 استلمت: {update.message.text}")
 
 def main():
     if not BOT_TOKEN:
-        raise RuntimeError("❌ BOT_TOKEN غير موجود في Environment Variables")
+        raise RuntimeError("❌ BOT_TOKEN غير موجود")
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
     logging.info("🤖 البوت يعمل الآن...")
-    app.run_polling()  # ✅ هنا لا نستخدم أي Updater قديم
+    app.run_polling()  # ✅ لا يوجد Updater هنا
 
 if __name__ == "__main__":
     main()
-
 
