@@ -1,8 +1,15 @@
-import logging
-import requests
-import json
+import os
 import re
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+import json
+import asyncio
+import logging
+import aiohttp
+
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup
+)
 from telegram.ext import (
     ApplicationBuilder,
     ContextTypes,
@@ -12,54 +19,73 @@ from telegram.ext import (
 )
 
 # =========================
-# الإعدادات
+# الإعدادات العامة
 # =========================
-TOKEN = "8564148855:AAFNunxN0ln5mUiSX6LpVBhX0fXtjNKqAaM"
 
+BOT_TOKEN = os.getenv("BOT_TOKEN")  # 🔒 أمان
 PROXY_API = "https://api.codetabs.com/v1/proxy/?quest="
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0",
+    "User-Agent": "Mozilla/5.0 (SnapBot)",
     "Accept": "text/html"
 }
 
+TIMEOUT = aiohttp.ClientTimeout(total=20)
+
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s"
 )
+logger = logging.getLogger("ZeroOne")
 
 # =========================
-# أوامر البوت
+# أدوات مساعدة
 # =========================
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "👋 أهلاً بك في **ZeroOne!**\n\n"
-        "📥 أرسل *اسم مستخدم سناب شات* لاستخراج القصص العامة.\n\n"
-        "مثال:\n"
-        "`snapchat`\n\n"
-        "⚠️ القصص الخاصة غير مدعومة.",
-        parse_mode="Markdown"
-    )
+
+USERNAME_REGEX = re.compile(r"^[a-zA-Z0-9._]{3,30}$")
+
+def valid_username(username: str) -> bool:
+    return bool(USERNAME_REGEX.match(username))
+
+
+async def fetch_html(url: str) -> str | None:
+    try:
+        async with aiohttp.ClientSession(timeout=TIMEOUT) as session:
+            async with session.get(url, headers=HEADERS) as response:
+                if response.status != 200:
+                    return None
+                return await response.text()
+    except Exception as e:
+        logger.warning(f"Fetch failed: {e}")
+        return None
+
 
 # =========================
 # منطق استخراج سناب
 # =========================
-def extract_snaps(username: str):
-    url = f"https://story.snapchat.com/@{username}"
-    proxy_url = PROXY_API + url
 
-    response = requests.get(proxy_url, headers=HEADERS, timeout=15)
-    html = response.text
+async def extract_snaps(username: str) -> list[str]:
+    target_url = f"https://story.snapchat.com/@{username}"
+    proxy_url = PROXY_API + target_url
+
+    html = await fetch_html(proxy_url)
+    if not html:
+        return []
 
     match = re.search(
-        r'<script id="__NEXT_DATA__" type="application/json">(.+?)</script>',
-        html
+        r'<script id="__NEXT_DATA__" type="application/json">\s*(\{.*?\})\s*</script>',
+        html,
+        re.DOTALL
     )
 
     if not match:
         return []
 
-    data = json.loads(match.group(1))
+    try:
+        data = json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return []
+
     snaps = (
         data.get("props", {})
         .get("pageProps", {})
@@ -76,36 +102,54 @@ def extract_snaps(username: str):
 
     return results
 
+
+# =========================
+# أوامر البوت
+# =========================
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "👋 أهلاً بك في **ZeroOne Bot**\n\n"
+        "📥 أرسل *اسم مستخدم سناب شات*\n"
+        "لاستخراج **القصص العامة فقط**\n\n"
+        "مثال:\n"
+        "`snapchat`\n\n"
+        "⚠️ القصص الخاصة غير مدعومة",
+        parse_mode="Markdown"
+    )
+
+
 # =========================
 # استقبال اسم المستخدم
 # =========================
-async def handle_username(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    username = update.message.text.strip().replace("@", "")
 
-    msg = await update.message.reply_text("⏳ جاري استخراج القصص...")
+async def handle_username(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    raw = update.message.text.strip()
+    username = raw.replace("@", "")
+
+    if not valid_username(username):
+        await update.message.reply_text("❌ اسم المستخدم غير صالح")
+        return
+
+    status = await update.message.reply_text("⏳ جاري استخراج القصص...")
 
     try:
-        snaps = extract_snaps(username)
+        snaps = await extract_snaps(username)
 
         if not snaps:
-            await msg.edit_text(
-                f"❌ لا توجد قصص عامة أو الحساب غير موجود.\n\n"
+            await status.edit_text(
+                "❌ لا توجد قصص عامة أو الحساب غير متاح\n\n"
                 f"🔗 https://story.snapchat.com/@{username}"
             )
             return
 
-        await msg.edit_text(f"✅ تم العثور على **{len(snaps)}** عنصر")
+        await status.edit_text(f"✅ تم العثور على {len(snaps)} قصة")
 
         for i, media_url in enumerate(snaps, start=1):
-            is_video = ".mp4" in media_url or "render" in media_url
+            is_video = any(x in media_url for x in (".mp4", "render", "manifest"))
 
             keyboard = InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton(
-                        "⬇️ تحميل مباشر",
-                        url=media_url
-                    )
-                ]
+                [InlineKeyboardButton("⬇️ تحميل مباشر", url=media_url)]
             ])
 
             caption = f"📦 ZeroOne\n👤 @{username}\n#{i}"
@@ -123,23 +167,29 @@ async def handle_username(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     reply_markup=keyboard
                 )
 
+            await asyncio.sleep(0.4)  # Anti-flood
+
     except Exception as e:
-        await msg.edit_text(
-            "⚠️ حدث خطأ أو تم حظر الاتصال.\n\n"
-            f"🔗 https://story.snapchat.com/@{username}"
-        )
+        logger.error(e)
+        await status.edit_text("⚠️ حدث خطأ غير متوقع")
+
 
 # =========================
 # تشغيل البوت
 # =========================
+
 def main():
-    app = ApplicationBuilder().token(TOKEN).build()
+    if not BOT_TOKEN:
+        raise RuntimeError("❌ BOT_TOKEN غير موجود في متغيرات البيئة")
+
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_username))
 
-    print("🤖 ZeroOne Telegram Bot is running...")
+    logger.info("🤖 ZeroOne Bot is running...")
     app.run_polling()
+
 
 if __name__ == "__main__":
     main()
