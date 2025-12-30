@@ -25,8 +25,7 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
     logging.info("🤖 البوت يعمل الآن...")
-    app.run_polling()  # ✅ لا يوجد Updater هنا
+    app.run_polling()  # ✅ بدون Updater نهائيًا
 
 if __name__ == "__main__":
     main()
-
