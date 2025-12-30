@@ -22,7 +22,7 @@ from telegram.ext import (
 # الإعدادات العامة
 # =========================
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")  # 🔒 أمان
+BOT_TOKEN = os.getenv("BOT_TOKEN")  # 🔒 أمان البوت
 PROXY_API = "https://api.codetabs.com/v1/proxy/?quest="
 
 HEADERS = {
@@ -45,10 +45,12 @@ logger = logging.getLogger("ZeroOne")
 USERNAME_REGEX = re.compile(r"^[a-zA-Z0-9._]{3,30}$")
 
 def valid_username(username: str) -> bool:
+    """يتأكد أن اسم المستخدم صالح"""
     return bool(USERNAME_REGEX.match(username))
 
 
 async def fetch_html(url: str) -> str | None:
+    """جلب صفحة HTML باستخدام aiohttp"""
     try:
         async with aiohttp.ClientSession(timeout=TIMEOUT) as session:
             async with session.get(url, headers=HEADERS) as response:
@@ -56,15 +58,16 @@ async def fetch_html(url: str) -> str | None:
                     return None
                 return await response.text()
     except Exception as e:
-        logger.warning(f"Fetch failed: {e}")
+        logger.warning(f"فشل تحميل الصفحة: {e}")
         return None
 
 
 # =========================
-# منطق استخراج سناب
+# استخراج القصص
 # =========================
 
 async def extract_snaps(username: str) -> list[str]:
+    """يستخرج روابط القصص العامة من سناب شات"""
     target_url = f"https://story.snapchat.com/@{username}"
     proxy_url = PROXY_API + target_url
 
@@ -108,13 +111,14 @@ async def extract_snaps(username: str) -> list[str]:
 # =========================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """رسالة ترحيب شخصية"""
+    user_first_name = update.effective_user.first_name or "صديقي"
     await update.message.reply_text(
-        "👋 أهلاً بك في **ZeroOne Bot**\n\n"
-        "📥 أرسل *اسم مستخدم سناب شات*\n"
-        "لاستخراج **القصص العامة فقط**\n\n"
-        "مثال:\n"
-        "`snapchat`\n\n"
-        "⚠️ القصص الخاصة غير مدعومة",
+        f"👋 أهلاً بك {user_first_name} في **بوت زيرو ون!**\n\n"
+        "📥 أرسل *اسم مستخدم سناب شات* لاستخراج **القصص العامة فقط**\n\n"
+        "⚠️ القصص الخاصة غير مدعومة\n\n"
+        "المطور: عبدالعزيز الرويلي\n"
+        "حساباتي للتواصل: https://bio-link.se/em2cc",
         parse_mode="Markdown"
     )
 
@@ -124,6 +128,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =========================
 
 async def handle_username(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة اسم المستخدم واستخراج القصص"""
     raw = update.message.text.strip()
     username = raw.replace("@", "")
 
@@ -152,7 +157,7 @@ async def handle_username(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("⬇️ تحميل مباشر", url=media_url)]
             ])
 
-            caption = f"📦 ZeroOne\n👤 @{username}\n#{i}"
+            caption = f"📦 زيرو ون\n👤 @{username}\n#{i}"
 
             if is_video:
                 await update.message.reply_video(
@@ -167,10 +172,10 @@ async def handle_username(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     reply_markup=keyboard
                 )
 
-            await asyncio.sleep(0.4)  # Anti-flood
+            await asyncio.sleep(0.4)  # لمنع الحظر
 
     except Exception as e:
-        logger.error(e)
+        logger.exception("⚠️ حدث خطأ أثناء استخراج القصص")
         await status.edit_text("⚠️ حدث خطأ غير متوقع")
 
 
@@ -187,7 +192,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_username))
 
-    logger.info("🤖 ZeroOne Bot is running...")
+    logger.info("🤖 بوت زيرو ون يعمل الآن...")
     app.run_polling()
 
 
