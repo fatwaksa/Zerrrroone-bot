@@ -1,3 +1,4 @@
+# bot.py
 import os
 import re
 import json
@@ -55,6 +56,7 @@ async def fetch_html(url: str) -> str | None:
         async with aiohttp.ClientSession(timeout=TIMEOUT) as session:
             async with session.get(url, headers=HEADERS) as response:
                 if response.status != 200:
+                    logger.warning(f"فشل تحميل الصفحة، الكود: {response.status}")
                     return None
                 return await response.text()
     except Exception as e:
