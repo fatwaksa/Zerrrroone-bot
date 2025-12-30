@@ -14,7 +14,7 @@ from telegram.ext import (
 # =========================
 # الإعدادات
 # =========================
-TOKEN = "PUT_YOUR_TELEGRAM_BOT_TOKEN_HERE"
+TOKEN = "8564148855:AAFNunxN0ln5mUiSX6LpVBhX0fXtjNKqAaM"
 
 PROXY_API = "https://api.codetabs.com/v1/proxy/?quest="
 
